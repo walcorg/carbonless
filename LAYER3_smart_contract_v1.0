@@ -1,0 +1,57 @@
+pragma solidity ^0.4.18;
+
+contract Tokentest {
+
+//********************************************************************************************************************************************************    
+//*******************************************AGREGAR FUNCIONALIDAD PARA INTERACTUAR CON LA PAGINA WEB ****************************************************
+//******************************** LA PAGINA WEB ADMINISTRARA LOS NOMBRES DE USUARIO Y LOS PASSWORD*******************************************************
+//************************EL SMART CONTRACT SOLO LLEVARA REGISTROS DE LAS WALLETS Y SUS TOKENS, EL NUMERO DE CICLOS Y LAS DIRECCIONES IP******************
+//*************** LA PAGINA WEB MOSTRARA LOS DATOS DE EFICIENCIA AL RECUPERAR E INTERPRETAR LOS BLOCK DE NOTAS********************************************
+//***EL SMART CONTRACT RELACIONARA LAS WALLET CON LAS DIRECCIONES IP Y LA PAGINA WEB RELACIONARA LOS NOMBRES DE USUARIO CON LAS DIRECCIONES IP************
+//**********************************************UNA FUNCION PARA REGISTRARSE Y OTRA PARA ACCEDER *********************************************************
+//*********FUNCION PARA VER REGISTROS. TRAERLOS DE IPFS PARA QUE EL NAVEGADOR LOS INTERPRETE, NO EL SMART CONTRACT. SOLO LECTURA.*************************
+//*************************************************FUNCION PARA ALMACENAR LOS BLOCK DE NOTAS PROVENIENTE DE LA RASPBERRY PI*******************************
+
+   struct REGISTRO_CULTIVADORES 
+
+    {
+    mapping(address => DATOS_WEB) REGISTRO_WEB; //DIRECCION DE LA WALLET DEL CULTIVADOR CREADAS A TRAVES DE LA PAGINA WEB
+    mapping(string => DATOS_TORRES) REGISTRO_TORRE; //DATOS ENVIADOS POR LAS RASPBERRY-PI
+    }
+
+    struct DATOS_WEB {//ESTOS DATOS SE OBTENDRAN DE LA PAGINA WEB WWW.WALCORG.COM/CODOSIN
+        //uint NOMBRE_USUARIO;        ************** ESTOS DATOS LOS DEBERIAN RECIBIR A TRAVES DE LA PAGINA WEB ********
+        //string PASSWORD_CULTIVADOR; ************** ESTOS DATOS LOS DEBERIAN RECIBIR A TRAVES DE LA PAGINA WEB ********
+        address DIRECCION_WALLET_CULTIVADOR;//SE LE PROPORCIONA AL USUARIO EL LINK PARA IR A MYWALLET.COM EL USUARIO REGRESA Y PEGA SU LLAVE PUBLICA. AGREGAR FUNCION PARA MODIFICAR DESPUES.
+        bytes32[] INDICADOR_USUARIO;//LISTA DE INDICES PARA UBICAR ELEMENTOS DENTRO DEL ARREGLO.
+    }
+//****************************************** FUNCION PARA GUARDAR LOS DATOS PROVENIENTES DE R_PI *********************************************************    
+//************************************** LA DIRECCION O ADDRESS DEL CONTRATO ES CONOCIDA DE ANTEMANO POR LA RASPBERRY-PI**********************************
+    address public R_PI;
+    int NO_CICLOS_MINUTO;
+//DE LOS DATOS RECIBIDOS YA SEA EN FORMA DE CARACTERES O DE NUMEROS NECESITAMOS UNA FUNCION QUE LOS DESMENUZE YA QUE TENDRAN EL SIG::FORMATO: 
+//NO_CICLOS_MINUTO.ADDRESS_IP....(5.192.168.1.79) ADEMAS DE QUE SOLIDITY NO ACEPTA PUNTO FLOTANTE.
+
+    function CONTADOR_CICLOS(int NO_CICLOS_TOTALES, int CO2IN_CULTIVADOR) public {//AQUI SE ALMACENA EL VALOR PROVENIENTE DE R_PI EN "NO_CICLOS_MINUTO"
+        R_PI = msg.sender;// AQUI SE ESTABLECE R_PI COMO EL OWNER DEL CONTRATO QUE ES QUIEN ES INTERACTUA CON EL CONTRATO.
+        NO_CICLOS_TOTALES = NO_CICLOS_TOTALES + NO_CICLOS_MINUTO;//AL RECIBIR EL NO. DE CICLOS DEBEN DE SUMARSE AL NUMERO DE CICLOS TOTALES
+ 
+            if (NO_CICLOS_TOTALES == 1000)                  // SI EL NUMERO DE CICLOS TOTALES ES IGUAL A 1,000 (EJEMPLO) 
+                CO2IN_CULTIVADOR == CO2IN_CULTIVADOR + 1;   // SUMAR 1 TON. A LAS TON. TOTALES
+                NO_CICLOS_TOTALES == 0;                     // UNA VEZ ALCANZADO LOS (1,000) CICLOS EL CONTADOR DEBE SER REINICIADO ... DE ALGUNA MANERA
+                
+    }
+//*************************************ESTRUCTURA PARA GUARDAR DATOS DE LAS TORRES************************************************************************ 
+//DEBO INDICARLE QUE VAYA AL "STRUCT DATOS_TORRES" Y EN EL ARREGLO CUYO "NOMBRE_USUARIO= NOMBRE_INTRODUCIDO"
+//CAMBIAR O SOBREESCRIBIR QUE "CO2IN_CULTIVADOR = NUEVO VALOR".
+    
+    struct DATOS_TORRES {//ESTOS DATOS SERAN PROPORCIONADOS POR LAS TORRES.
+        //uint NOMBRE_USUARIO;//DADA VARIAS DIRECCIONES IP, VARIAS DE ELLAS PUEDEN TENER EL MISMO NOMBRE DE USUARIO Y POR LO TANTO LA MISMA DIRECCION DE WALLETT.
+        string ADDRESS_IP;
+        uint CO2IN_CULTIVADOR;//AQUI SE SUMARAN EL NUMERO DE TON. DE CO2...POR EJEMPLO CADA 1,000 CICLOS EQUIVALEN A 1 TON.
+        bytes32[] INDICADOR_IP;//LISTA DE INDICES PARA UBICAR ELEMENTOS DENTRO DEL ARREGLO.
+    }
+}
+//********************************************************************************************************************************************************
+//********************************************************************************************************************************************************
+//********************************************************************************************************************************************************
