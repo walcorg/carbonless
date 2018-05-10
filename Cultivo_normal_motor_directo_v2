@@ -1,0 +1,558 @@
+/*  ___           ___  ___      _       _____   ______   ______    _____                */
+/*  \  \    _    /  / / _ \    | |     |  ___| |  __  | |  __  |  | ____|               */
+/*   \  \  | |  /  / / /_\ \   | |     | |     | |  | | | |  | |  | | __                */
+/*    \  \_| |_/  / /  ___  \  | |___  | |___  | |__| | | | / /   | |_\ |               */
+/*     \_________/ /__/   \__\ |_____| |_____| |______| |_|  \_\  |_____|               */
+/*                                                                                      */
+/*  T  E  C  N  O  L  O  G  I  A  S    A  L  T  E  R  N  A  T  I  V  A  S               */
+/*--WALCORG.SALINA CRUZ OAX.MEX.--RUTINA PARA CULTIVO NORMAL EN UN FOTOBIORREACTOR V10.2*/
+/*El nombre de las valvulas esta designado de acuerdo a [KSANDRA-DISEÑO D INGENIERIA DETALLADA pag.16-18]*/
+
+   /*****************************************VARIABLES PARA CALCULO DE TEMPERATURA Y DE CONTROL****************************************************/
+   #include <Wire.h>
+   long milivolts;
+   const int sensor=A0;
+   long temperaturavalue;
+   int temperatura=analogRead(A0); /*Los pines analogos de entrada pueden ser usados como pines digitales si se denotan como A0, A1, etc.*/
+   int varcontrol;/*Es el contador para registrar la posicion de la bomba y el vastago, 1 O 2*/
+   int varHDN=0;/*Instruccion recibida desde la interfaz HDN*/
+   /*C o 3 absorber refrigerante/ D o 4 vaciar refrigerante/E o 5 absorber cultivo/F o 6 vaciar cultivo/ G o 7 muestrear/H u 8 seca/I u 9 inocular/J u 10 APAGAR*/
+   int dataestado[4];/*Arreglo de 5 posiciones para guardar los datos de ESTADO del NODO*/
+   /*****************************************ASIGNACION DE FUNCIONES PARA CADA PIN********************************************************/
+   int bateria=analogRead(A1);
+   int nivel=analogRead(A2);
+   int ph=analogRead(A3);
+   int posicionASUP=A4;      /*Final de carrera conectado en serie entre si que indicara cuando el motor gire 180 grados..POSIBLEMENTE REEMPLKAZDO POR I2C SDA*/
+   int posicionBINF=A5;      /*Final de carrera conectado en serie entre si que indicara cuando el motor gire 180 gradosPOSIBLEMENTE REEMPLKAZDO POR I2C SCL*/
+   int inicio=A6;            /*Boton de inicio*/
+   int cosecha=A7;           /*Boton de cosecha*/
+   
+   int comunicaPinEntrada=0; /*D0  PARA USAR EN MODO TORRE.Recibira una señal provenienete del nodo anterior ¡¡¡ASEGURATE DE HABER RECABLEADO D0 Y D1*/
+   int valvsolenoide01=1;    /*D1  Circuito de refrigeracion o RELE/RESISTENCIA/SECADO. ACCESO DE LIQUIDOS.¡¡¡ASEGURATE DE HABER RECABLEADO D0 Y D1*/
+   int valvsolenoide02=2;    /*D2  Circuto formado por los 2 cilindros SUPeriores*/
+   int valvsolenoide03=3;    /*D3  Circuto formado por los 2 cilindros SUPeriores. SACAR Y METER GASES Y LIQUIDOS A MEDIO DE CULTIVO*/
+   int valvsolenoide04=4;    /*D4  Circuto formado por los 2 cilindros SUPeriores. SACAR Y METER TRAZAS DE NUTRIENTES, ES PARA INOCULAR*/
+   int valvsolenoide05=5;    /*D5  Circuto formado por los 2 cili+ndros SUPeriores*/
+   int valvsolenoide06=6;    /*D6  Circuto formado por los 2 cilindros SUPeriores*/
+   int valvsolenoide07=7;    /*D7  Circuto formado por los 2 cilindros INFeriores*/
+   int valvsolenoide08=8;    /*D8  Circuto formado por los 2 cilindros INFeriores*/
+   int valvsolenoide09=9;    /*D9  Circuto formado por los 2 cilindros INFeriores. SACAR Y METER GASES Y LIQUIDOS A MEDIO DE CULTIVO*/
+   int valvsolenoide10=10;   /*D10 Circuto formado por los 2 cilindros INFeriores*/
+   int motoresDC=11;         /*D11 Motores directos que impulsan la bomba. Los pines 9, 10 y 11 pueden emitir una señal en forma de pulso*/
+   int limpieza=12;          /*D12 Motor de corriente continua utilizado para limpieza.*/
+   int comunicaPinSalida=13; /*D13 PARA USAR EN MODO TORRE. Este pin enviara una señal al siguiente nodo*/
+/******************************************************************************************************************************************/
+     
+      
+void setup() {
+   pinMode(LED_BUILTIN, OUTPUT);  //ASIGNACION DEL PIN INCORPORADO EN LA TARJETA
+   Wire.begin(8);                 // DIRECCION ASIGNADA EN EL ARREGLO. PARA LA TORRE DE NODOS SE ASIGNARA UNA DIRECCION DISTINTA A CADA NODO.
+   Wire.onRequest(rEvent);        // NOMBRE DEL EVENTO QUE SE LLAMARA DESPUES                        
+   Serial.begin(9600);
+   pinMode(0,INPUT);
+   pinMode(1,OUTPUT);
+   pinMode(2,OUTPUT);
+   pinMode(3,OUTPUT);
+   pinMode(4,OUTPUT);
+   pinMode(5,OUTPUT);
+   pinMode(6,OUTPUT);
+   pinMode(7,OUTPUT);
+   pinMode(8,OUTPUT);
+   pinMode(9,OUTPUT);
+   pinMode(10,OUTPUT);
+   pinMode(11,OUTPUT);
+   pinMode(12,OUTPUT);
+   pinMode(13,OUTPUT);
+                          }
+   void loop()       
+   {
+/************************************************ENCEDIDO Y APAGADO DEL PIN INCORPORADO PARA VERIFICAR EL FUNCIONAMIENTO************************/ 
+  digitalWrite(LED_BUILTIN, HIGH);   // ENCIENDE EL PIN
+  delay(3000);                       // ESPERA 3 SEGUNDOS
+  digitalWrite(LED_BUILTIN, LOW);    // APAGA EL PIN
+
+/************************************************CALCULO DE TEMPERATURA*************************************************************************/ 
+    milivolts=(analogRead(sensor)*5000L)/1023;
+    temperaturavalue=milivolts/10;
+    Serial.print("Temperatura:     ");
+    Serial.print(temperaturavalue);
+    Serial.println("  grados");
+/************************************CREACION DE ARREGLO PARA ENVIAR A HDN**********************************************************************/
+                   
+    dataestado[0]=varcontrol;        // asigna l valor VARCONTROL a la posición 1, puede ser 1 o 2, la HDN lo graficara e interpretara al 2 como −1.
+    dataestado[1]=temperaturavalue;  // asigna l valor temperaturavalue a la posición 2
+    dataestado[2]=bateria;           // asigna l valor temperaturavalue a la posición 3
+    dataestado[3]=nivel;             // asigna l valor temperaturavalue a la posición 4
+    dataestado[4]=ph;                // asigna l valor temperaturavalue a la posición 5
+    
+/*********************************RECEPCION DE INSTRUCCIONES Y ENVIO DE DATOS DE ESTADO. DESDE Y HACIA INTERFAZ HDN****************************************************/ 
+        if (Serial.available() > 0) 
+        {
+        varHDN = Serial.read();// Lee el byte de entrada proveniente de HDN
+        Serial.print(dataestado[4]);//ENVIO DE ARREGLO ESTADO. La HDN desmenusara el arreglo y mostrara en pantalla los datos en el lugar adecuado.
+       
+        }
+        
+/*****************************************BOTONES FISICOS. SOLO 2; ENCENDIDO Y COSECHA. Y EL APAGADO....*******************************************/
+        
+        if(inicio=HIGH)/*boton de INICIO*/
+                        {
+                        varHDN=1;
+                        /******************************************************************************************************/        
+                        /********************************* A   P   A   G   A   D   O ******************************************/        
+                        /*******************Anidar instruccion de APAGADO aqui, DETENER TODO***********************************/
+                        /****************/ delay (4000);   /****Esperar 4 segundos*********************************************/
+                        /****************/ if(inicio=HIGH)/*Si el boton de INICIO sigue presionado*****************************/
+                        /****************/                    {                                         /**********************/
+                        /****************/ varHDN=10;/*Para el caso 10 se programa el APAGADO*/         /**********************/
+                        /****************/ }                                                            /**********************/
+                        /****************/ else                                                         /**********************/
+                        /****************/ {                                                            /**********************/
+                        /****************/ varHDN=1;/*Si el tiempo es menor se enciende normalmente****************************/
+                        /****************/ }                                                            /**********************/
+                        /******************************************************************************************************/             
+                        /******************************************************************************************************/
+                        }
+        
+        else if(cosecha=HIGH)/*boton de COSECHA*/
+                        {
+                        varHDN=2;
+                        }
+        else 
+                        {
+                        Serial.print("ESPERANDO");
+                        }
+
+/****************************************CONDICION PARA ACTIVAR CONTROL DE TEMPERATURA*******************************************************/
+                    if(temperatura>37)
+                                        
+                            {     
+                        /******SI VA A PASAR MUCHO TIEMPO ABIERTO LO MEJOR SERIA QUE LA VALVULA FUERA NORMALMENTE ABIERTA***********/
+                        /*****************O RETIRARLA POR COMPLETO Y DESIGNAR ESTE RELE AL EVAPORADOR*****************************/
+                        digitalWrite(valvsolenoide01,HIGH); /*Circuito de refrigeracion permanece abierto PARA QUE disminuya temperatura*/
+                            }
+                    else
+                            {
+                        Serial.print("T menor a 37, CIRCUITO DE REFRIGERACION DESACTIVADO");
+                            }
+/***************************************************************************************************************************************************/
+/*******************************PROGRAMAR BOTON FISICO 1 DE INICIO.INCLUYE DRENADO DE GASES (CO2, O2) E INOCULACION*********************************/
+/*******************************PROGRAMAR BOTON FISICO 2 DE COSECHA. INCLUYE MUESTREAR Y SECAR******************************************************/
+/*******************************PROGRAMAR BOTON VIRTUAL 3 ABSORBER REFRIGERANTE*********************************************************************/
+/*******************************PROGRAMAR BOTON VIRTUAL 4 VACIAR REFRIGERANTE***********************************************************************/
+/*******************************PROGRAMAR BOTON VIRTUAL 5 ABSORBER CULTIVO**************************************************************************/
+/*******************************PROGRAMAR BOTON VIRTUAL 6 VACIAR CULTIVO****************************************************************************/
+/*******************************PROGRAMAR BOTON VIRTUAL 7 MUESTREAR*********************************************************************************/
+/*******************************PROGRAMAR BOTON VIRTUAL 8 SECAR*************************************************************************************/
+/*******************************PROGRAMAR BOTON VIRTUAL 9 INOCULAR**********************************************************************************/
+/*******************************PROGRAMAR BOTON FISICO 10 DETENER**********************************************************************************/
+
+                        switch (varHDN)// Dependiendo de la variable recibida de HDN o de los botones.
+                        {
+/*******************************************************************************************************************************************/ 
+/*************************************** I  N  I  C  I  O **********************************************************************************/
+/*******************************************************************************************************************************************/ 
+                     INICIAR:; case 1:(varHDN=1);// Adquirira valor 1 al presionar el boton de INICIO o si se le indica desde la HDN
+/*******************************PROGRAMAR BOTON FISICO DE INICIO, SECUENCIA DE INICIO, DRENADO DE GASES (CO2, O2) E INOCULACION Y TIEMPOS DE LIMPIEZA*************/   
+                        digitalWrite(motoresDC,HIGH); /*Activacion de los motores DC DE LA BOMBA...EL CORAZON DEL NODO. SI SE ACTIVA SIN VALVULAS ABIERTAS TRONARA**/                  
+                  if(posicionASUP=HIGH)/*Para determinar si coincidieron ARRIBA*/
+
+                        {
+                        {
+                       varcontrol=1;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+      Serial.println(5);/*Se notifica que coincide en la parte superior, para que HDN grafique*/
+      /*********************EL CAMBIO EN LA CONFIGURACION DE LAS VALVULAS SE REALIZARA CADA VEZ QUE SE AVANCEN 180 GRADOS*******************/
+
+      /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide02,HIGH); /*ABRIR VALVULA 2. EXTRAER GASES DEL EXTERIOR durante la carrera.**************/
+      /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide08,HIGH); /*ABRIR VALVULA 8. SACAR GASES de los cilindro al EXTERIOR durante la carrera.*/
+                          
+                         }
+                         while (varcontrol=1);
+                         }                                              
+/*******************************************************************************************************************************************/                     
+                 
+                  else if(posicionBINF=HIGH)/*Para determinar si coincidieron ABAJO. Esta instruccion debe ejecutarse aun fuera de este ciclo*/
+
+                        {
+                        {
+                       varcontrol=2;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+  Serial.println(6);/*Se notifica que coincide en la parte inferior, para que HDN grafique*/     
+  /*****************************************CILINDROS SUPERIORES SINCRONIZADOS**************************************************************/               
+  digitalWrite(valvsolenoide03,HIGH); /*ABRIR VALVULA 3. METER GASES de los cilindro al INTERIOR durante la carrera.************************/
+  /*****************************************CILINDROS INFERIORES SINCRONIZADOS**************************************************************/
+  digitalWrite(valvsolenoide09,HIGH); /*ABRIR VALVULA 9. EXTRAER GASES DEL INTERIOR durante la carrera*/
+  
+                        }
+                         while (varcontrol=2);
+/*******************************************************************************************************************************************/                         
+                          }
+                                               
+                  else
+                      
+                      {
+                      Serial.print("DESPLAZANDO");
+                      
+                       }
+                          break;
+/*******************************************************************************************************************************************/ 
+/********************************************* C  O  S  E  C  H  A  R ************************************************************************/
+/*******************************************************************************************************************************************/ 
+                     case 2:(varHDN=2);// Solo adquirira valor 2 al presionar el boton de cosechar.
+/*******************************PROGRAMAR BOTON FISICO DE COSECHA*********************************************************************************/      
+
+digitalWrite(motoresDC,HIGH); /*Activacion de los motores DC DE LA BOMBA...EL CORAZON DEL NODO. SI SE ACTIVA SIN VALVULAS ABIERTAS...TRONARA****/                  
+                  if(posicionASUP=HIGH)/*Para determinar si coincidieron ARRIBA*/
+/*Debe agregarse un contador de ciclos o incorporar el indicador de nivel para saber cuando se ha VACIADO Y REGRESADO lo suficiente*/ 
+                        {
+                        {
+                       varcontrol=1;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+      Serial.println(5);/*Se notifica que coincide en la parte superior, para que HDN grafique*/
+      /*********************EL CAMBIO EN LA CONFIGURACION DE LAS VALVULAS SE REALIZARA CADA VEZ QUE SE AVANCEN 180 GRADOS*******************/
+
+      /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide03,HIGH); /*ABRIR VALVULA 3. EXTRAER LIQUIDOS del INTERIOR durante la carrera*/
+      
+      /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide07,HIGH); /*ABRIR VALVULA 7. EXTRAER LIQUIDOS del EXTERIOR al cilindro durante la carrera**/  
+     
+      /**************************************************DESPLAZAMIENTO O CARRERA****************************************/
+                           
+                         }
+                         while (varcontrol=1);
+                         }                                              
+/*******************************************************************************************************************************************/                     
+                 
+                  else if(posicionBINF=HIGH)/*Para determinar si coincidieron ABAJO. Esta instruccion debe ejecutarse aun fuera de este ciclo*/
+
+                        {
+                        {
+                       varcontrol=2;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+  Serial.println(6);/*Se notifica que coincide en la parte inferior, para que HDN grafique*/     
+  /*****************************************CILINDROS SUPERIORES SINCRONIZADOS******************************************/               
+  digitalWrite(valvsolenoide06,HIGH); /*ABRIR VALVULA. SACAR LIQUIDOS DEL CILINDRO HACIA EL EXTERIOR********************/   
+  /*****************************************AQUI SE PRODUCE UNA RECIRCULACION CON AYUDA DEL APENDICE DE PRODUCTOS ******/
+  /*****************************************CILINDROS INFERIORES SINCRONIZADOS******************************************/
+  digitalWrite(valvsolenoide09,HIGH); /*ABRIR VALVULA. METER LIQUIDOS DEL CILINDRO HACIA EL CULTIVO*********************/
+                        
+                        }
+                         while (varcontrol=2);
+/*******************************************************************************************************************************************/                         
+                          }
+                                               
+                  else
+                      
+                      {
+                      Serial.print("DESPLAZANDO");
+                      
+                       }
+                       
+                         digitalWrite(valvsolenoide01,HIGH);/*ENCENDER RESISTENCIA EN SECADOR DE ALUMINIO*/    
+                        /*AGREGAR TERMOSTATO O ENCENDER Y APAGAR LA RESISTENCIA POR PERIODOS PARA QUE NO SE SOBRECALIENTE*/  
+
+                          goto INICIAR;//REGRESAR AL INICIO DESPUES DE SECAR, MIENTRAS SE SECA DEBERIA DE FUNCIONAR NORMALMENTE.
+                          
+/*******************************************************************************************************************************************/ 
+/************************* A  B  S  O  R  B  E  R    R  E  F  R  I  G  E  R  A  N  T  E ******************************************************/
+/*******************************************************************************************************************************************/ 
+                     case 3:(varHDN=3);
+/*******************************PROGRAMAR BOTON VIRTUAL ABSORBER REFRIGERANTE*********************************************************************/                          
+                          break;
+               
+/*******************************************************************************************************************************************/ 
+/************************* V  A  C  I  A  R    R  E  F  R  I  G  E  R  A  N  T  E ************************************************************/
+/*******************************************************************************************************************************************/ 
+                     case 4:(varHDN=4);
+/******************************* PROGRAMAR BOTON VIRTUAL VACIAR REFRIGERANTE *********************************************************************/                          
+                          break;   
+                          
+/*******************************************************************************************************************************************/ 
+/************************* A  B  S  O  R  B  E  R    C  U  L  T  I  V  O *********************************************************************/
+/*******************************************************************************************************************************************/ 
+                     case 5:(varHDN=5);
+/******************************* PROGRAMAR BOTON VIRTUAL ABSORBER CULTIVO ************************************************************************/ 
+digitalWrite(motoresDC,HIGH); /*Activacion de los motores DC DE LA BOMBA...EL CORAZON DEL NODO. SI SE ACTIVA SIN VALVULAS ABIERTAS...TRONARA****/                  
+                  if(posicionASUP=HIGH)/*Para determinar si coincidieron ARRIBA*/
+/*Debe agregarse un contador de ciclos o incorporar el indicador de nivel para saber cuando se ha LLENADO*/ 
+                        {
+                        {
+                       varcontrol=1;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+      Serial.println(5);/*Se notifica que coincide en la parte superior, para que HDN grafique*/
+      /*********************EL CAMBIO EN LA CONFIGURACION DE LAS VALVULAS SE REALIZARA CADA VEZ QUE SE AVANCEN 180 GRADOS*******************/
+
+      /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide06,HIGH); /*ABRIR VALVULA. EXTRAER LIQUIDOS del EXTERIOR durante la carrera*/
+      
+      /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide09,HIGH); /*ABRIR VALVULA. EXTRAER gases del interior durante la carrera**/  
+     
+                          
+                         }
+                         while (varcontrol=1);
+                         }                                              
+/*******************************************************************************************************************************************/                     
+                 
+                  else if(posicionBINF=HIGH)/*Para determinar si coincidieron ABAJO. Esta instruccion debe ejecutarse aun fuera de este ciclo*/
+
+                        {
+                        {
+                       varcontrol=2;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+  Serial.println(6);/*Se notifica que coincide en la parte inferior, para que HDN grafique*/     
+  /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/               
+  digitalWrite(valvsolenoide03,HIGH); /*ABRIR VALVULA. METER LIQUIDOS DEL CILINDRO HACIA EL INTERIOR*/    
+  
+  /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+  digitalWrite(valvsolenoide08,HIGH); /*ABRIR VALVULA. SACAR GASES DEL CILINDRO HACIA EL EXTERIOR*/
+  
+                     
+                        }
+                         while (varcontrol=2);
+/*******************************************************************************************************************************************/                         
+                        }
+                                               
+                  else
+                      
+                      {
+                      Serial.print("DESPLAZANDO");
+                      
+                       }
+                       
+                          break;
+
+/*******************************************************************************************************************************************/ 
+/******************************************** V  A  C  I  A  R    C  U  L  T  I  V  O ********************************************************/
+/*******************************************************************************************************************************************/ 
+                     case 6:(varHDN=6);
+/*******************************PROGRAMAR BOTON VIRTUAL VACIAR CULTIVO*************************************************************************/ 
+
+  digitalWrite(motoresDC,HIGH); /*Activacion de los motores DC DE LA BOMBA...EL CORAZON DEL NODO. SI SE ACTIVA SIN VALVULAS ABIERTAS...TRONARA****/                  
+                  if(posicionASUP=HIGH)/*Para determinar si coincidieron ARRIBA*/
+/*Debe agregarse un contador de ciclos o incorporar el indicador de nivel para saber cuando se ha VACIADO*/ 
+                        {
+                        {
+                       varcontrol=1;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+      Serial.println(5);/*Se notifica que coincide en la parte superior, para que HDN grafique*/
+      /*********************EL CAMBIO EN LA CONFIGURACION DE LAS VALVULAS SE REALIZARA CADA VEZ QUE SE AVANCEN 180 GRADOS*******************/
+
+      /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide03,HIGH); /*ABRIR VALVULA 3. EXTRAER LIQUIDOS del INTERIOR durante la carrera*/
+      
+      /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide08,HIGH); /*ABRIR VALVULA 8. EXTRAER gases del EXTERIOR al cilindro durante la carrera**/  
+     
+                                
+                         }
+                         while (varcontrol=1);
+                         }                                              
+/*******************************************************************************************************************************************/                     
+                 
+                  else if(posicionBINF=HIGH)/*Para determinar si coincidieron ABAJO. Esta instruccion debe ejecutarse aun fuera de este ciclo*/
+
+                        {
+                        {
+                       varcontrol=2;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+  Serial.println(6);/*Se notifica que coincide en la parte inferior, para que HDN grafique*/     
+  /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/               
+  digitalWrite(valvsolenoide06,HIGH); /*ABRIR VALVULA. SACAR LIQUIDOS DEL CILINDRO HACIA EL EXTERIOR*****************/    
+  
+  /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+  digitalWrite(valvsolenoide09,HIGH); /*ABRIR VALVULA. METER GASES DEL CILINDRO HACIA EL INTERIOR********************/
+  
+ 
+                        }
+                         while (varcontrol=2);
+/*******************************************************************************************************************************************/                         
+                          }
+                                               
+                  else
+                      
+                      {
+                      Serial.print("DESPLAZANDO");
+                      
+                       }
+                          break;
+
+/*******************************************************************************************************************************************/                          
+/************************************************ M  U  E  S  T  R  E  A  R ******************************************************************/ 
+/*******************************************************************************************************************************************/ 
+                     case 7:(varHDN=7);
+/******************************* PROGRAMAR BOTON VIRTUAL MUESTREAR *******************************************************************************/ 
+/************************* DEBE VACIAR (hacerlo pasar a traves del filtro )EL 90 POR 100 DE TODO EL CULTIVO Y VOLVERLO A METER********************/ 
+
+digitalWrite(motoresDC,HIGH); /*Activacion de los motores DC DE LA BOMBA...EL CORAZON DEL NODO. SI SE ACTIVA SIN VALVULAS ABIERTAS...TRONARA****/                  
+                  if(posicionASUP=HIGH)/*Para determinar si coincidieron ARRIBA*/
+/*Debe agregarse un contador de ciclos o incorporar el indicador de nivel para saber cuando se ha VACIADO Y REGRESADO lo suficiente*/ 
+                        {
+                        {
+                       varcontrol=1;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+      Serial.println(5);/*Se notifica que coincide en la parte superior, para que HDN grafique*/
+      /*********************EL CAMBIO EN LA CONFIGURACION DE LAS VALVULAS SE REALIZARA CADA VEZ QUE SE AVANCEN 180 GRADOS*******************/
+
+      /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide03,HIGH); /*ABRIR VALVULA 3. EXTRAER LIQUIDOS del INTERIOR durante la carrera*/
+      
+      /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide07,HIGH); /*ABRIR VALVULA 7. EXTRAER LIQUIDOS del EXTERIOR al cilindro durante la carrera**/  
+     
+      /**************************************************DESPLAZAMIENTO O CARRERA****************************************/
+                           
+                         }
+                         while (varcontrol=1);
+                         }                                              
+/*******************************************************************************************************************************************/                     
+                 
+                  else if(posicionBINF=HIGH)/*Para determinar si coincidieron ABAJO. Esta instruccion debe ejecutarse aun fuera de este ciclo*/
+
+                        {
+                        {
+                       varcontrol=2;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+  Serial.println(6);/*Se notifica que coincide en la parte inferior, para que HDN grafique*/     
+  /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/               
+  digitalWrite(valvsolenoide06,HIGH); /*ABRIR VALVULA. SACAR LIQUIDOS DEL CILINDRO HACIA EL EXTERIOR*****************/    
+  
+  /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+  digitalWrite(valvsolenoide09,HIGH); /*ABRIR VALVULA. METER LIQUIDOS DEL CILINDRO HACIA EL CULTIVO********************/
+                        
+                        }
+                         while (varcontrol=2);
+/*******************************************************************************************************************************************/                         
+                          }
+                                               
+                  else
+                      
+                      {
+                      Serial.print("DESPLAZANDO");
+                      
+                       }
+                          break;
+
+/*******************************************************************************************************************************************/                          
+/*************************************************** S  E  C  A  R ***************************************************************************/ 
+/*******************************************************************************************************************************************/ 
+                    SECADO:; case 8:(varHDN=8);
+/******************************* PROGRAMAR BOTON VIRTUAL SECAR ***********************************************************************************/      
+                        digitalWrite(valvsolenoide01,HIGH);/*ENCENDER RESISTENCIA, PARECE QUE valvsolenoide04 NO SE OCUPA*/    
+                        /*AGREGAR TERMOSTATO O ENCENDER Y APAGAR LA RESISTENCIA POR PERIODOS PARA QUE NO SE SOBRECALIENTE*/  
+
+                          break; 
+
+/*******************************************************************************************************************************************/                          
+/************************************************** I  N  O  C  U  L  A  R *******************************************************************/ 
+/*******************************************************************************************************************************************/  
+                     case 9:(varHDN=9);
+/************************* PROGRAMAR BOTON VIRTUAL INOCULAR. INTRODUCIR UNA PEQUENA CANTIDAD DEREACTIVOS AL CULTIVO*************************/                          
+                          
+   digitalWrite(motoresDC,HIGH); /*Activacion de los motores DC DE LA BOMBA...EL CORAZON DEL NODO. SI SE ACTIVA SIN VALVULAS ABIERTAS...TRONARA****/                  
+                  if(posicionASUP=HIGH)/*Para determinar si coincidieron ARRIBA*/
+                  /*BASTARA CON MEDIO CICLO EN LA CUAL SE ABSORBERA UNA PEQUENA CANTIDAD DE REACTIVOS MEZCLADO CON AIRE*/ 
+                        {
+                        {
+                       varcontrol=1;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+      Serial.println(5);/*Se notifica que coincide en la parte superior, para que HDN grafique*/
+      /*********************EL CAMBIO EN LA CONFIGURACION DE LAS VALVULAS SE REALIZARA CADA VEZ QUE SE AVANCEN 180 GRADOS*******************/
+
+      /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide04,HIGH); /*ABRIR VALVULA. EXTRAER UNA PEQUENA CANTIDAD DE LIQUIDO de REACTIVOS EXTERIOR durante la carrera*/
+      digitalWrite(valvsolenoide02,HIGH); /*ABRIR VALVULA. EXTRAER MEZCLADOS CON LOS REACTIVOS.*/      
+      /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+      digitalWrite(valvsolenoide09,HIGH); /*ABRIR VALVULA. EXTRAER gases del interior durante la carrera**/  
+             delay(4000);
+      digitalWrite(valvsolenoide04,LOW); /*CERRAR VALVULA.*/
+                         }
+                         while (varcontrol=1);
+                         }                                              
+/*******************************************************************************************************************************************/                     
+                 
+                  else if(posicionBINF=HIGH)/*Para determinar si coincidieron ABAJO. Esta instruccion debe ejecutarse aun fuera de este ciclo*/
+
+                        {
+                        {
+                       varcontrol=2;/*Si no se crea esta variable el bloque solo se ejecutara cuando pasen por el punto de sincronia, lo cual dura solo 1 segundo*/
+                        }
+                        
+                        do /*En cambio este bloque se ejecutara aun cuando se haya pasado el punto de sincronia*/
+                        { 
+  Serial.println(6);/*Se notifica que coincide en la parte inferior, para que HDN grafique*/     
+  /*****************************************CILINDROS SUPERIORES SINCRONIZADOS***************************************/               
+  digitalWrite(valvsolenoide03,HIGH); /*ABRIR VALVULA. METER LIQUIDOS DEL CILINDRO HACIA EL INTERIOR*/    
+  
+  /*****************************************CILINDROS INFERIORES SINCRONIZADOS***************************************/
+  digitalWrite(valvsolenoide08,HIGH); /*ABRIR VALVULA. SACAR GASES DEL CILINDRO HACIA EL EXTERIOR*/
+  
+                     
+                        }
+                         while (varcontrol=2);
+/*******************************************************************************************************************************************/                         
+                        }
+                                               
+                  else 
+                      {
+                      Serial.print("DESPLAZANDO");
+                      
+                       }
+                       goto INICIAR;//REGRESAR AL INICIO
+                          
+                          
+                         
+/*******************************************************************************************************************************************/                          
+/************************************************ A  P  A  G  A  D  O ***********************************************************************/ 
+/*******************************************************************************************************************************************/  
+                     case 10:(varHDN=10);
+/*******************************PROGRAMAR APAGADO********************************************************************************/                          
+                          
+                          break;                           
+                          
+                     default:Serial.print("ESPERANDO INSTRUCCION");
+                                                                        
+                        }
+        
+
+                     }
+
+   void rEvent() //EVENTO DE ENVIO DE DATOS
+   {
+  Wire.write("67890"); // RESPONDE CON 5 CARACTERES
+   }
+                       
