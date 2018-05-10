@@ -1,0 +1,109 @@
+##from web3 import web3, HTTPProvide
+##from solc import compile_source
+##from web3.contract import ConciseContract
+
+##w3 = Web3(HTTPProvider('http://127.0.0.1:8545'))
+
+
+import smbus
+import time
+bus = smbus.SMBus(1)
+address1 = 7
+address2 = 8
+
+##PARA TOMA DE MUESTRAS DE DATOS BASTARA CADA 5 SGS Y ENVIAR BLOQUES DE 10 MINUTOS AL SMART CONTRACT
+##ES DECIR CADA 10 MINUTOS DEBERA CREARSE UN ARCHIVO DE NOTAS NUEVO.
+##CADA 24 HORAS DEBERA BORRARSE EL CONTENIDO DE LA CARPETA EN DONSE SE GUARDAN LOS ARCHIVOC
+
+#abi can be generated form the command line with solc or online with Remix IDE
+#abi = '''
+#[
+#	{
+#		"constant": false,
+#		"inputs": [
+#			{
+#				"name": "NO_CICLOS_TOTALES",
+#				"type": "int256"
+#			},
+#			{
+#				"name": "CO2IN_CULTIVADOR",
+#				"type": "int256"
+#			}
+#		],
+#		"name": "CONTADOR_CICLOS",
+#		"outputs": [],
+#		"payable": false,
+#		"stateMutability": "nonpayable",
+#		"type": "function"
+#	}
+#	{
+#		"constant": true,
+#		"inputs": [],
+#		"name": "R_PI"
+#		"outputs": [
+#			{
+#				"name": ""
+#				"type": "address"
+#			}
+#		],
+#		"payable": false,
+#		"stateMutability": "view",
+#		"type": "function"
+#	}
+#]
+#'''
+
+#Replace with real deployed contract addres
+#address = Web3.toChecksumAddress("0x24965665d2bcc5905ceeb8c4fa5eace01b0a704f")
+#StoreIntegerValue = w3.eth.contract(
+#    address, abi=abi, ContractFactoryClass=ConciseContract)
+
+#Replace with real account address for raspi
+#raspi = 0xE0b28C70ACc867df7d9FC826fdf750E104399285
+
+#Example function to submit data to the block chain
+#def submitSensorData(data1):
+    #note that data must be an integer,
+#    StoreIntegerValue.setSensorData(int(data1), transact={'from': raspi})
+
+while True:
+    
+    localtime = time.asctime( time.localtime(time.time()) )##HORA LOCAL DE RASPBERRY PI 
+    ##AL USAR ESTE FORMATO DE HORA COMBINADO CON LA CREACION DE ARCHIVOS SE CREARA
+    ##UN ARCHIVO DE BLOCK DE NOTAS NUEVO CADA MINUTO. AL DIA SERIAN 24X60=1440 ARCHIVOS!!
+    localtime2 = time.strftime("%H:%M")  
+    print "--------------------------------------------------------"
+    print "--------TORRE #1-WALCORG-TECNOLOGIAS-ALTERNATIVAS-------"
+    print "HORA LOCAL:", localtime
+    data3 = localtime2
+    try:
+       
+        rep1 =bus.read_i2c_block_data(address1,0)##LECTURA DE LAS DIRECCIONES I2C
+        rep2 =bus.read_i2c_block_data(address2,0)
+      ##  T=T+1
+       
+    except:
+        continue
+    string = "VARIABLES DE NODO #1 "
+    for i in range(0,5):##LAS 5 VARIABLES DE ESTADO ENVIADOS DESDE ARDUINO
+        string += chr(rep1[i])
+    print string
+    data1=[string]
+
+    string = "VARIABLES DE NODO #2 "
+    for i in range(0,5):
+        string += chr(rep2[i])
+    print string
+    data2 = [string]
+  ##  print (T)
+
+    fichero = open('Desktop/REGISTRO DE DATOS '+str(data3)+'.txt', 'a')
+    for l in data1:
+        fichero.write(l + '\n')
+    for l in data2:
+        fichero.write(l + '\n')
+        fichero.close()
+    
+
+       
+time.sleep(1)
