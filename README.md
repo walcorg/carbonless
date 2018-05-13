@@ -1,5 +1,5 @@
 # CARBONLESSopen source
-A traves de nuestros fotobiorreactores (OPEN SOURCE) cualquier persona podra capturar CO2 y esta captura quedara registrada en una cadena de bloques o blockchain (ERC20-ETHERREUM) despues podra intercambiar esa captura a traves de nuestra plataforma. Descarfar el whitepaper:(https://drive.google.com/file/d/1Qt9Unu2Uw1wAy4mbLOGfFATuBwEL_PhW/view?usp=sharing).
+A traves de nuestros fotobiorreactores (OPEN SOURCE) cualquier persona podra capturar CO2 y esta captura quedara registrada en una cadena de bloques o blockchain (ERC20-ETHERREUM) despues podra intercambiar esa captura a traves de nuestra plataforma. Descargar el whitepaper:(https://drive.google.com/file/d/1Qt9Unu2Uw1wAy4mbLOGfFATuBwEL_PhW/view?usp=sharing).
 
 Borradores de los controladores de los nodos (FOTOBIORREACTORES) y nodriza (UNIDADES DE MANTTO. DE LOS FOTOBIORREACTRORES).
 Existen 4 capas;
