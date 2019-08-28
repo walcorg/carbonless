@@ -1,57 +1,136 @@
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.19;
 
-contract Tokentest {
-
-//********************************************************************************************************************************************************    
-//*******************************************AGREGAR FUNCIONALIDAD PARA INTERACTUAR CON LA PAGINA WEB ****************************************************
-//******************************** LA PAGINA WEB ADMINISTRARA LOS NOMBRES DE USUARIO Y LOS PASSWORD*******************************************************
-//************************EL SMART CONTRACT SOLO LLEVARA REGISTROS DE LAS WALLETS Y SUS TOKENS, EL NUMERO DE CICLOS Y LAS DIRECCIONES IP******************
-//*************** LA PAGINA WEB MOSTRARA LOS DATOS DE EFICIENCIA AL RECUPERAR E INTERPRETAR LOS BLOCK DE NOTAS********************************************
-//***EL SMART CONTRACT RELACIONARA LAS WALLET CON LAS DIRECCIONES IP Y LA PAGINA WEB RELACIONARA LOS NOMBRES DE USUARIO CON LAS DIRECCIONES IP************
-//**********************************************UNA FUNCION PARA REGISTRARSE Y OTRA PARA ACCEDER *********************************************************
-//*********FUNCION PARA VER REGISTROS. TRAERLOS DE IPFS PARA QUE EL NAVEGADOR LOS INTERPRETE, NO EL SMART CONTRACT. SOLO LECTURA.*************************
-//*************************************************FUNCION PARA ALMACENAR LOS BLOCK DE NOTAS PROVENIENTE DE LA RASPBERRY PI*******************************
-
-   struct REGISTRO_CULTIVADORES 
-
-    {
-    mapping(address => DATOS_WEB) REGISTRO_WEB; //DIRECCION DE LA WALLET DEL CULTIVADOR CREADAS A TRAVES DE LA PAGINA WEB
-    mapping(string => DATOS_TORRES) REGISTRO_TORRE; //DATOS ENVIADOS POR LAS RASPBERRY-PI
-    }
-
-    struct DATOS_WEB {//ESTOS DATOS SE OBTENDRAN DE LA PAGINA WEB WWW.WALCORG.COM/CODOSIN
-        //uint NOMBRE_USUARIO;        ************** ESTOS DATOS LOS DEBERIAN RECIBIR A TRAVES DE LA PAGINA WEB ********
-        //string PASSWORD_CULTIVADOR; ************** ESTOS DATOS LOS DEBERIAN RECIBIR A TRAVES DE LA PAGINA WEB ********
-        address DIRECCION_WALLET_CULTIVADOR;//SE LE PROPORCIONA AL USUARIO EL LINK PARA IR A MYWALLET.COM EL USUARIO REGRESA Y PEGA SU LLAVE PUBLICA. AGREGAR FUNCION PARA MODIFICAR DESPUES.
-        bytes32[] INDICADOR_USUARIO;//LISTA DE INDICES PARA UBICAR ELEMENTOS DENTRO DEL ARREGLO.
-    }
-//****************************************** FUNCION PARA GUARDAR LOS DATOS PROVENIENTES DE R_PI *********************************************************    
-//************************************** LA DIRECCION O ADDRESS DEL CONTRATO ES CONOCIDA DE ANTEMANO POR LA RASPBERRY-PI**********************************
-    address public R_PI;
-    int NO_CICLOS_MINUTO;
-//DE LOS DATOS RECIBIDOS YA SEA EN FORMA DE CARACTERES O DE NUMEROS NECESITAMOS UNA FUNCION QUE LOS DESMENUZE YA QUE TENDRAN EL SIG::FORMATO: 
-//NO_CICLOS_MINUTO.ADDRESS_IP....(5.192.168.1.79) ADEMAS DE QUE SOLIDITY NO ACEPTA PUNTO FLOTANTE.
-
-    function CONTADOR_CICLOS(int NO_CICLOS_TOTALES, int CO2IN_CULTIVADOR) public {//AQUI SE ALMACENA EL VALOR PROVENIENTE DE R_PI EN "NO_CICLOS_MINUTO"
-        R_PI = msg.sender;// AQUI SE ESTABLECE R_PI COMO EL OWNER DEL CONTRATO QUE ES QUIEN ES INTERACTUA CON EL CONTRATO.
-        NO_CICLOS_TOTALES = NO_CICLOS_TOTALES + NO_CICLOS_MINUTO;//AL RECIBIR EL NO. DE CICLOS DEBEN DE SUMARSE AL NUMERO DE CICLOS TOTALES
+contract CULTIVODENODOS {
+// Grow identifying information, environmental data, component states
+  struct Grow {             //En esta estructura se guardaran los datos de cada usuario.
+    uint id;                //De acuerdo a como entren en la red se les asignara un numero identificador.
+    string NOMBRE;          //Lo introduce el usuario cuando inicia la interfaz.
+    string DIRECCION_IP;    //Lo introduce el usuario cuando inicia la interfaz, 
+                            //varias IP pueden estar asociadas a una misma WALLETT_ADRESS.
+    string WALLETT_ADDRESS; //Lo introduce el usuario cuando inicia la interfaz.
+    uint TEMPERATURA;       //La TEMP. en el interior del cultivo. Esta var la podria enviar a la web la R-PI.
+    uint EFICIENCIA;        //La eficiencia sera calculada por la RASPBERRY PI
+    uint CICLOS;            //Determinada cantidad de ciclos equivale a 1 Ton. de CO2 capturada. 
+    //Cada hora aprox. se enviara al smart contract cuantos ciclos ejecuto y el smart contract los agregara a un contador.
+    //que establecera una equivalencia entre no. de ciclos y tokens, po ejem. 10,000 ciclos = 1 Token.
+    uint VARIABLE_X;        //Poria ser el Ph o el estado de la bateria.
+  }
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////Otros datos seran enviados desde la RASPBERRY PI a la pagina web directamente.///////////    
+////////////////////////////////////////////////////////////////////////////////////////////////
+     
  
-            if (NO_CICLOS_TOTALES == 1000)                  // SI EL NUMERO DE CICLOS TOTALES ES IGUAL A 1,000 (EJEMPLO) 
-                CO2IN_CULTIVADOR == CO2IN_CULTIVADOR + 1;   // SUMAR 1 TON. A LAS TON. TOTALES
-                NO_CICLOS_TOTALES == 0;                     // UNA VEZ ALCANZADO LOS (1,000) CICLOS EL CONTADOR DEBE SER REINICIADO ... DE ALGUNA MANERA
-                
-    }
-//*************************************ESTRUCTURA PARA GUARDAR DATOS DE LAS TORRES************************************************************************ 
-//DEBO INDICARLE QUE VAYA AL "STRUCT DATOS_TORRES" Y EN EL ARREGLO CUYO "NOMBRE_USUARIO= NOMBRE_INTRODUCIDO"
-//CAMBIAR O SOBREESCRIBIR QUE "CO2IN_CULTIVADOR = NUEVO VALOR".
-    
-    struct DATOS_TORRES {//ESTOS DATOS SERAN PROPORCIONADOS POR LAS TORRES.
-        //uint NOMBRE_USUARIO;//DADA VARIAS DIRECCIONES IP, VARIAS DE ELLAS PUEDEN TENER EL MISMO NOMBRE DE USUARIO Y POR LO TANTO LA MISMA DIRECCION DE WALLETT.
-        string ADDRESS_IP;
-        uint CO2IN_CULTIVADOR;//AQUI SE SUMARAN EL NUMERO DE TON. DE CO2...POR EJEMPLO CADA 1,000 CICLOS EQUIVALEN A 1 TON.
-        bytes32[] INDICADOR_IP;//LISTA DE INDICES PARA UBICAR ELEMENTOS DENTRO DEL ARREGLO.
-    }
+// Grow added. Agregar cultivo.
+  event GrowAdded(uint id, string NOMBRE);
+  // Temperature changed. Cambio de temperatura
+  event TempChange(uint id, uint TEMPERATURA);
+  // Humidity changed. Cambio de eficiencia.
+  event HumidityChange(uint id, uint EFICIENCIA);
+  // Soil Moisture changed. Cambio en el numero de ciclos.
+  event SoilMoistureChange(uint id, uint CICLOS);
+  // Light Intensity changed. Cambios en la variable "X".
+  event LightIntensityChange(uint id, uint VARIABLE_X);
+  // IP Address changed. Cambios en la direccion IP. 
+  event IpChange(uint id, string DIRECCION_IP);
+  
+  ////////////////////////////// 
+  ///AQUI BORRE VARIAS COSAS////
+  //////////////////////////////
+  
+  // Associate Grow with an owner address, asociacion de un cultivo con la direccion del dueño.
+  mapping(uint => address) public growToOwner;
+  // Associate Grow with a bucket address, asocicacion de un cultivo con la direccion de la cubeta que sera LA TORRE DE NODOS.
+  mapping(uint => address) public growToBucket;
+  // Associate Owner with a Grow count, asociacion del dueño con una cuenta de cultivo.
+  mapping(address => uint) public ownerGrowCount;
+  // Associate Owner with growIds, asociacion del dueño con varias ID'S 
+  mapping(address => uint[]) public ownerToGrow;
+  //Associate Owner with ADDRESS_WALLETT, asociacion del dueño con una direccion WALLETT.
+  mapping(uint=> address) public ownerToWallett;
+  // Unique Grow identifier. Identificador de crecimiento unico.
+  uint currentGrowId = 0; //Identificador actual = 0 por que esta iniciando.
+
+  // Collection of Grows. Coleccion de cultivos.
+  Grow[] public grows;
+
+  // Create new Grow. Crear cultivo nuevo.
+  // Assign to sender address. Asignarlo a la direccion de quien lo envia.
+  // Trigger GrowAdded event. Evento disparador o iniciador para agregar cultivo.
+  // Increment unique Grow identifier. Incremento en el identificador de cultivo unico.
+  function createGrow(string _newName, address _newBucketAddress, address _DIRECCION_WALLETT) public {
+    grows.push(Grow(currentGrowId, _newName, '','', 0, 0, 0, 0));//Aqui se especifica la estructura de los datos
+    growToOwner[currentGrowId] = msg.sender;//Aqui se asocia al que envia las ordenes con su ID.
+    growToBucket[currentGrowId] = _newBucketAddress;//Aqui se asocia el identificador del cultivo con la nueva direccion de la "cubeta" que sera la torre de nodos.
+    ownerToWallett[currentGrowId] = _DIRECCION_WALLETT;//Aqui se asocia al identificador del cultivo con su direccion WALLETT.
+    ownerGrowCount[msg.sender] += 1;//Incremento del numero de cultivos.
+    ownerToGrow[msg.sender].push(currentGrowId);//Al parecer aqui identifica quien envia las ordenes dentro del arreglos. 
+    GrowAdded(currentGrowId, _newName);
+    currentGrowId++;
+  }
+
+  // Address permission helper. Para saber quien intenta acceder se encuentra en la base de datos.
+  function isPermittedAddress(uint _growId, address _senderAddress) private constant returns (bool) {
+    return _senderAddress == growToOwner[_growId] || _senderAddress == growToBucket[_growId];
+  }
+  
+  // Get number of Grows for an Owner. Obtener el numero de cultivos de un dueño.
+  function getGrowCount(address _ownerAddress) public constant returns (uint) {
+    return ownerGrowCount[_ownerAddress];
+  }
+  
+  // Get Grow at index for Owner. Obtener el cultivo para un dueño dado un indice.
+  function getGrowIdByIndex(uint _index) public constant returns (uint) {
+    return ownerToGrow[msg.sender][_index];
+  }
+
+  //Estas funciones ESTABLECEN valores para el cultivo ordenados desde la pagina WEB.
+  // Setters
+  // Check that sender owns the Grow. Verifica que quien envia la instruccion es dueño del cultivo.
+  // Update stored value for a Grow. Actualiza un valor almacenado para un cultivo, de la web a la "TORRE DE NODOS".
+  // Trigger change event. Cambia el valor dado un indice de cultivador.
+
+  // function setTemp(uint _growId, uint _newTemp) public {
+  // require(isPermittedAddress(_growId, msg.sender));
+  // grows[_growId].TEMPERATURA = _newTemp;
+  // TempChange(_growId, _newTemp);
+  // }
+
+  /////////////////////////////////////////////////////////////////////////////////////////////////// 
+  ////CUANDO UN COMPRADOR ADQUIERA TOKENS LA PAGINA WEB ENVIARA UNA INSTRUCCION AL SMART CONTRACT////
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+  //FUNCION DE CREACION DE TOKENS, TASA DE CONVERSION DE ACUERDO A FECHA EN QUE SE CAPTURO EL CO2.
+  //FUNCION DE TRANSFERENCIA DE TOKENS A WALLETT DE COMPRADOR, SE REQUIERE ADDRESS WALLETT.
+  //FUNCION DE RECUPERACION # DE TRANSACCION(ES) PARA ENVIARLO A LA PAG. WEB E IMPRIMIRLO EN UN CERTIFICADO.
+
+
+
+    // Getters.Funciones para obtener datos...GET.. de obtener.
+    // Estas son las variables que se mostraran en la interfaz de usuario del cultivador
+    // Seran recuperadas a traves del smart contract por lo menos el # de ciclos.
+  function getTEMP(uint _growId) public constant returns (uint) {
+    return grows[_growId].TEMPERATURA;
+  }
+
+  function getEFICIENCIA(uint _growId) public constant returns (uint) {
+    return grows[_growId].EFICIENCIA;
+  }
+
+  function getCICLOS(uint _growId) public constant returns (uint) {
+    return grows[_growId].CICLOS;
+  }
+
+  function getVARIABLE_X(uint _growId) public constant returns (uint) {
+    return grows[_growId].VARIABLE_X;
+  }
+
+  function getDIRECCION_IP(uint _growId) public constant returns (string) {
+    return grows[_growId].DIRECCION_IP;
+  }
+
 }
-//********************************************************************************************************************************************************
-//********************************************************************************************************************************************************
-//********************************************************************************************************************************************************
+
+  ///////////////////////////////////////////////////////////////////////////////////////////// 
+  ////////////////////// CODIGO PARA AMINISTRAR TOKENS A PARTIR DE AQUI. //////////////////////
+  /////////////////////// 2 SMARTCONTRACT'S EN 1 SOLO O 2 SEPARADOS? //////////////////////////
+  /////////////////////////////////////////////////////////////////////////////////////////////
